@@ -1,0 +1,95 @@
+{
+  "updated_at": "2026-06-26T20:49:15Z",
+  "tags": [
+    {
+      "en": "Roguelike",
+      "ja": "ローグライク",
+      "file": "Roguelike",
+      "count": 70
+    },
+    {
+      "en": "Roguelite",
+      "ja": "ローグライト",
+      "file": "Roguelite",
+      "count": 70
+    },
+    {
+      "en": "Metroidvania",
+      "ja": "メトロイドヴァニア",
+      "file": "Metroidvania",
+      "count": 1461
+    },
+    {
+      "en": "Platformer",
+      "ja": "プラットフォーマー",
+      "file": "Platformer",
+      "count": 9114
+    },
+    {
+      "en": "Action RPG",
+      "ja": "アクションRPG",
+      "file": "Action_RPG",
+      "count": 4494
+    },
+    {
+      "en": "Survival",
+      "ja": "サバイバル",
+      "file": "Survival",
+      "count": 7379
+    },
+    {
+      "en": "Tower Defense",
+      "ja": "タワーディフェンス",
+      "file": "Tower_Defense",
+      "count": 2133
+    },
+    {
+      "en": "Puzzle",
+      "ja": "パズル",
+      "file": "Puzzle",
+      "count": 16912
+    },
+    {
+      "en": "Visual Novel",
+      "ja": "ビジュアルノベル",
+      "file": "Visual_Novel",
+      "count": 6195
+    },
+    {
+      "en": "Horror",
+      "ja": "ホラー",
+      "file": "Horror",
+      "count": 10896
+    },
+    {
+      "en": "Sandbox",
+      "ja": "サンドボックス",
+      "file": "Sandbox",
+      "count": 5196
+    },
+    {
+      "en": "Strategy",
+      "ja": "ストラテジー",
+      "file": "Strategy",
+      "count": 19213
+    },
+    {
+      "en": "Simulation",
+      "ja": "シミュレーション",
+      "file": "Simulation",
+      "count": 19424
+    },
+    {
+      "en": "Fighting",
+      "ja": "格闘",
+      "file": "Fighting",
+      "count": 1325
+    },
+    {
+      "en": "Shoot 'em up",
+      "ja": "シューティング",
+      "file": "Shoot__em_up",
+      "count": 70
+    }
+  ]
+}
