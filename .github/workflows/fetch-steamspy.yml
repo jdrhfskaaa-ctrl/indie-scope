@@ -1,0 +1,103 @@
+name: Fetch SteamSpy Data
+
+on:
+  schedule:
+    - cron: '0 3 * * *'   # 毎日 日本時間 12:00 に実行
+  workflow_dispatch:        # 手動実行ボタンも有効化
+  push:
+    branches: [main]        # pushのたびにも実行（初回データ取得のため）
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch SteamSpy tag data
+        run: |
+          mkdir -p data
+
+          TAGS=(
+            "Roguelike"
+            "Roguelite"
+            "Metroidvania"
+            "Platformer"
+            "Action RPG"
+            "Survival"
+            "Tower Defense"
+            "Puzzle"
+            "Visual Novel"
+            "Horror"
+            "Sandbox"
+            "Strategy"
+            "Simulation"
+            "Fighting"
+            "Shoot 'em up"
+          )
+
+          for TAG in "${TAGS[@]}"; do
+            ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$TAG'))")
+            FILENAME=$(echo "$TAG" | tr ' ' '_' | tr "'" '_')
+            echo "Fetching: $TAG -> data/${FILENAME}.json"
+            curl -s --retry 3 --retry-delay 5 \
+              "https://steamspy.com/api.php?request=tag&tag=${ENCODED}" \
+              -o "data/${FILENAME}.json"
+            sleep 2
+          done
+
+      - name: Generate index manifest
+        run: |
+          python3 - << 'EOF'
+          import os, json
+
+          tags = [
+            {"en": "Roguelike",      "ja": "ローグライク",         "file": "Roguelike"},
+            {"en": "Roguelite",      "ja": "ローグライト",         "file": "Roguelite"},
+            {"en": "Metroidvania",   "ja": "メトロイドヴァニア",   "file": "Metroidvania"},
+            {"en": "Platformer",     "ja": "プラットフォーマー",   "file": "Platformer"},
+            {"en": "Action RPG",     "ja": "アクションRPG",        "file": "Action_RPG"},
+            {"en": "Survival",       "ja": "サバイバル",           "file": "Survival"},
+            {"en": "Tower Defense",  "ja": "タワーディフェンス",   "file": "Tower_Defense"},
+            {"en": "Puzzle",         "ja": "パズル",               "file": "Puzzle"},
+            {"en": "Visual Novel",   "ja": "ビジュアルノベル",     "file": "Visual_Novel"},
+            {"en": "Horror",         "ja": "ホラー",               "file": "Horror"},
+            {"en": "Sandbox",        "ja": "サンドボックス",       "file": "Sandbox"},
+            {"en": "Strategy",       "ja": "ストラテジー",         "file": "Strategy"},
+            {"en": "Simulation",     "ja": "シミュレーション",     "file": "Simulation"},
+            {"en": "Fighting",       "ja": "格闘",                 "file": "Fighting"},
+            {"en": "Shoot 'em up",   "ja": "シューティング",       "file": "Shoot__em_up"},
+          ]
+
+          # 各ファイルの最終更新時刻とゲーム数を記録
+          manifest = {"tags": [], "updated_at": ""}
+          import datetime
+          manifest["updated_at"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+
+          for t in tags:
+            path = f"data/{t['file']}.json"
+            count = 0
+            if os.path.exists(path):
+              try:
+                with open(path) as f:
+                  data = json.load(f)
+                  count = len(data)
+              except:
+                pass
+            manifest["tags"].append({**t, "count": count})
+
+          with open("data/manifest.json", "w") as f:
+            json.dump(manifest, f, ensure_ascii=False, indent=2)
+
+          print("manifest.json generated")
+          EOF
+
+      - name: Commit and push data
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          git diff --staged --quiet && echo "No changes" || \
+            (git commit -m "chore: update SteamSpy data $(date -u +%Y-%m-%d)" && git push)
