@@ -202,7 +202,7 @@
       <div class="kpi-card"><div class="kpi-label">中央値 価格</div><div class="kpi-value" id="kpiPrice">—</div><div class="kpi-sub">有料タイトルのみ</div></div>
       <div class="kpi-card"><div class="kpi-label">平均スコア</div><div class="kpi-value" id="kpiScore">—</div><div class="kpi-sub">レビュースコア</div></div>
       <div class="kpi-card"><div class="kpi-label">無料比率</div><div class="kpi-value" id="kpiFree">—</div><div class="kpi-sub">F2Pタイトル割合</div></div>
-      <div class="kpi-card"><div class="kpi-label">中央値 プレイ時間</div><div class="kpi-value" id="kpiPlay">—</div><div class="kpi-sub">全期間</div></div>
+      <div class="kpi-card"><div class="kpi-label">中央値 プレイ時間</div><div class="kpi-value" id="kpiPlay">—</div><div class="kpi-sub">同時接続数の中央値</div></div>
     </div>
 
     <div class="chart-grid">
@@ -214,14 +214,14 @@
       <div class="table-title">このジャンルの売れ筋 トップ10</div>
       <table>
         <thead><tr>
-          <th>#</th><th>ゲーム名</th><th>推定オーナー数</th><th>価格</th><th>スコア</th><th>Avg プレイ時間</th>
+          <th>#</th><th>ゲーム名</th><th>推定オーナー数</th><th>価格</th><th>スコア</th><th>同時接続(CCU)</th>
         </tr></thead>
         <tbody id="topTable"></tbody>
       </table>
     </div>
 
     <div class="footnote">
-      データソース: SteamSpy API（steamspy.com）毎日自動更新 ／ 価格は円換算（$1 = ¥155）<br>
+      データソース: SteamSpy API（steamspy.com）毎日自動更新 ／ 価格はSteamSpy取得時の円表示<br>
       販売本数はSteamSpyによる推定値です。IndieScope はインディー開発者向けの非公式ツールです。
     </div>
   </div>
@@ -295,7 +295,17 @@ function fmtOwners(n) {
   if (n>=1000) return Math.round(n/1000)+'K';
   return n.toString();
 }
-function fmtYen(cents) { return '¥'+(Math.round(cents/100*155)).toLocaleString('ja-JP'); }
+// price は円単位の文字列（例: "5999" = ¥5,999）
+function parsePrice(p) { return parseInt(p) || 0; }
+function fmtYen(yen) { return '¥' + yen.toLocaleString('ja-JP'); }
+// positive/negative からスコアを計算（score_rankは常に空）
+function calcScore(g) {
+  const pos = parseInt(g.positive) || 0;
+  const neg = parseInt(g.negative) || 0;
+  const total = pos + neg;
+  if (total < 10) return null;
+  return Math.round(pos / total * 100);
+}
 function destroyChart(k) { if(charts[k]){ charts[k].destroy(); delete charts[k]; } }
 
 // ── 分析メイン ──
@@ -332,29 +342,30 @@ async function analyze() {
 
 // ── 結果描画 ──
 function renderResults(games) {
-  const ownersList  = games.map(g=>parseOwners(g.owners)).filter(n=>n>0);
-  const paidGames   = games.filter(g=>g.price>0);
-  const priceList   = paidGames.map(g=>g.price);
-  const scoredGames = games.filter(g=>g.score_rank && g.score_rank!=='');
-  const avgScore    = scoredGames.length
-    ? Math.round(scoredGames.reduce((s,g)=>s+parseFloat(g.score_rank),0)/scoredGames.length) : null;
-  const ptList      = games.map(g=>g.median_forever).filter(n=>n>0);
+  // price は円単位の文字列 → 整数に変換
+  const ownersList = games.map(g=>parseOwners(g.owners)).filter(n=>n>0);
+  const priceList  = games.map(g=>parsePrice(g.price)).filter(p=>p>0);
+  const scoreList  = games.map(g=>calcScore(g)).filter(s=>s!==null);
+  // CCU（同時接続数）をプレイ活発度として代用
+  const ccuList    = games.map(g=>parseInt(g.ccu)||0).filter(n=>n>0);
 
-  const medOwners = median(ownersList);
-  const medPrice  = median(priceList);
-  const freeRatio = Math.round(games.filter(g=>g.price===0).length/games.length*100);
-  const medPlay   = Math.round(median(ptList)/60);
+  const medOwners  = median(ownersList);
+  const medPrice   = median(priceList);
+  const avgScore   = scoreList.length ? Math.round(scoreList.reduce((a,b)=>a+b,0)/scoreList.length) : null;
+  const freeCount  = games.filter(g=>parsePrice(g.price)===0).length;
+  const freeRatio  = Math.round(freeCount/games.length*100);
+  const medCcu     = Math.round(median(ccuList));
 
-  // 判定
+  // 判定（中央値販売本数とタイトル数で飽和度を評価）
   let verdict;
-  if (medOwners >= 50000 && games.length < 150)      verdict = 'blue-ocean';
-  else if (medOwners < 10000 || games.length > 220)  verdict = 'red-ocean';
-  else                                                verdict = 'yellow-ocean';
+  if      (medOwners >= 50000 && games.length < 150) verdict = 'blue-ocean';
+  else if (medOwners < 10000  || games.length > 220) verdict = 'red-ocean';
+  else                                               verdict = 'yellow-ocean';
 
   const vMap = {
-    'blue-ocean':   { icon:'🌊', title:'ブルーオーシャン — 参入余地あり',  text:`タイトル数${games.length}本・中央値販売本数${fmtOwners(medOwners)}。市場規模があり競合が薄い状況です。差別化次第で十分に勝機があります。` },
-    'yellow-ocean': { icon:'⚡', title:'イエローオーシャン — 戦略次第',    text:`タイトル数${games.length}本・中央値販売本数${fmtOwners(medOwners)}。競合は一定数いますが、明確な差別化があれば戦えます。` },
-    'red-ocean':    { icon:'🔴', title:'レッドオーシャン — 高競争環境',   text:`タイトル数${games.length}本・中央値販売本数${fmtOwners(medOwners)}。飽和気味のジャンルです。よほど尖ったアプローチが必要です。` },
+    'blue-ocean':   { icon:'🌊', title:'ブルーオーシャン — 参入余地あり', text:`タイトル数${games.length}本・中央値販売本数${fmtOwners(medOwners)}。市場規模があり競合が薄い状況です。差別化次第で十分に勝機があります。` },
+    'yellow-ocean': { icon:'⚡', title:'イエローオーシャン — 戦略次第',   text:`タイトル数${games.length}本・中央値販売本数${fmtOwners(medOwners)}。競合は一定数いますが、明確な差別化があれば戦えます。` },
+    'red-ocean':    { icon:'🔴', title:'レッドオーシャン — 高競争環境',  text:`タイトル数${games.length}本・中央値販売本数${fmtOwners(medOwners)}。飽和気味のジャンルです。よほど尖ったアプローチが必要です。` },
   };
   const v = vMap[verdict];
   document.getElementById('verdictBanner').className = `verdict ${verdict}`;
@@ -367,63 +378,71 @@ function renderResults(games) {
   document.getElementById('kpiOwners').textContent = fmtOwners(medOwners);
   document.getElementById('kpiPrice').textContent  = medPrice ? fmtYen(medPrice) : '—';
   document.getElementById('kpiFree').textContent   = freeRatio+'%';
-  document.getElementById('kpiPlay').textContent   = medPlay+'h';
+  // プレイ時間の代わりに中央値CCU（同時接続）を表示
+  document.getElementById('kpiPlay').textContent   = medCcu ? medCcu.toLocaleString('ja-JP') : '—';
   const scoreEl = document.getElementById('kpiScore');
   scoreEl.textContent = avgScore ? avgScore+'%' : '—';
-  scoreEl.className = 'kpi-value ' + (avgScore>=80?'pos':avgScore>=60?'warn':'neg');
+  scoreEl.className   = 'kpi-value ' + (!avgScore?'':avgScore>=80?'pos':avgScore>=60?'warn':'neg');
 
   // オーナー分布チャート
   const oBuckets = [
-    {l:'~1K',  lo:0,      hi:1000},
-    {l:'1K~5K',lo:1000,   hi:5000},
-    {l:'5K~20K',lo:5000,  hi:20000},
-    {l:'20K~100K',lo:20000,hi:100000},
-    {l:'100K~',lo:100000, hi:Infinity},
+    {l:'~1K',    lo:0,       hi:1000},
+    {l:'1K~5K',  lo:1000,    hi:5000},
+    {l:'5K~20K', lo:5000,    hi:20000},
+    {l:'20K~100K',lo:20000,  hi:100000},
+    {l:'100K~',  lo:100000,  hi:Infinity},
   ];
   const oCounts = oBuckets.map(b=>ownersList.filter(n=>n>b.lo&&n<=b.hi).length);
   destroyChart('owners');
   charts['owners'] = new Chart(document.getElementById('chartOwners'), {
     type:'bar',
-    data:{ labels:oBuckets.map(b=>b.l), datasets:[{ data:oCounts, backgroundColor:'rgba(91,140,255,0.65)', borderColor:'rgba(91,140,255,1)', borderWidth:1, borderRadius:4 }] },
+    data:{ labels:oBuckets.map(b=>b.l), datasets:[{ data:oCounts,
+      backgroundColor:'rgba(91,140,255,0.65)', borderColor:'rgba(91,140,255,1)', borderWidth:1, borderRadius:4 }] },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-      scales:{ x:{ticks:{color:'#7a8499',font:{size:11}},grid:{color:'#2a3148'}}, y:{ticks:{color:'#7a8499',font:{size:11}},grid:{color:'#2a3148'}} } }
+      scales:{ x:{ticks:{color:'#7a8499',font:{size:11}},grid:{color:'#2a3148'}},
+               y:{ticks:{color:'#7a8499',font:{size:11}},grid:{color:'#2a3148'}} } }
   });
 
-  // 価格分布チャート
-  const allPricesYen = games.map(g=>Math.round(g.price/100*155));
+  // 価格分布チャート（price は円単位）
   const pCounts = [
-    games.filter(g=>g.price===0).length,
-    allPricesYen.filter(p=>p>0&&p<=500).length,
-    allPricesYen.filter(p=>p>500&&p<=1000).length,
-    allPricesYen.filter(p=>p>1000&&p<=2000).length,
-    allPricesYen.filter(p=>p>2000&&p<=4000).length,
-    allPricesYen.filter(p=>p>4000).length,
+    games.filter(g=>parsePrice(g.price)===0).length,
+    games.filter(g=>{ const p=parsePrice(g.price); return p>0&&p<=500; }).length,
+    games.filter(g=>{ const p=parsePrice(g.price); return p>500&&p<=1000; }).length,
+    games.filter(g=>{ const p=parsePrice(g.price); return p>1000&&p<=2000; }).length,
+    games.filter(g=>{ const p=parsePrice(g.price); return p>2000&&p<=4000; }).length,
+    games.filter(g=>{ const p=parsePrice(g.price); return p>4000; }).length,
   ];
   destroyChart('price');
   charts['price'] = new Chart(document.getElementById('chartPrice'), {
     type:'doughnut',
     data:{ labels:['無料','~¥500','¥500~1K','¥1K~2K','¥2K~4K','¥4K~'],
-      datasets:[{ data:pCounts, backgroundColor:['rgba(255,107,107,0.8)','rgba(91,140,255,0.8)','rgba(67,233,123,0.8)','rgba(255,200,80,0.8)','rgba(180,130,255,0.8)','rgba(80,200,220,0.8)'], borderWidth:0 }] },
+      datasets:[{ data:pCounts,
+        backgroundColor:['rgba(255,107,107,0.8)','rgba(91,140,255,0.8)','rgba(67,233,123,0.8)',
+          'rgba(255,200,80,0.8)','rgba(180,130,255,0.8)','rgba(80,200,220,0.8)'], borderWidth:0 }] },
     options:{ responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{ position:'right', labels:{ color:'#7a8499', font:{size:11}, boxWidth:12, padding:8 } } } }
   });
 
-  // トップ10テーブル
+  // トップ10テーブル（オーナー数降順）
   const top10 = [...games].sort((a,b)=>parseOwners(b.owners)-parseOwners(a.owners)).slice(0,10);
   document.getElementById('topTable').innerHTML = top10.map((g,i)=>{
     const own   = fmtOwners(parseOwners(g.owners));
-    const price = g.price===0 ? '<span style="color:var(--muted)">無料</span>' : fmtYen(g.price);
-    const score = g.score_rank
-      ? `<div class="score-row"><div class="score-bar"><div class="score-fill" style="width:${g.score_rank}%"></div></div><span class="mono" style="font-size:11px">${Math.round(g.score_rank)}%</span></div>`
+    const price = parsePrice(g.price)===0
+      ? '<span style="color:var(--muted)">無料</span>'
+      : fmtYen(parsePrice(g.price));
+    const sc    = calcScore(g);
+    const score = sc!==null
+      ? `<div class="score-row"><div class="score-bar"><div class="score-fill" style="width:${sc}%"></div></div><span class="mono" style="font-size:11px">${sc}%</span></div>`
       : '<span style="color:var(--muted)">—</span>';
-    const pt = g.median_forever>0 ? Math.round(g.median_forever/60)+'h' : '—';
+    const ccu = parseInt(g.ccu)||0;
+    const ccuStr = ccu>0 ? ccu.toLocaleString('ja-JP') : '—';
     return `<tr>
       <td class="mono" style="color:var(--muted);font-size:12px">${i+1}</td>
       <td><div class="game-name">${g.name||'—'}</div><div class="game-dev">${g.developer||'—'}</div></td>
       <td class="mono">${own}</td>
       <td class="mono">${price}</td>
       <td>${score}</td>
-      <td class="mono">${pt}</td>
+      <td class="mono">${ccuStr}</td>
     </tr>`;
   }).join('');
 
