@@ -333,7 +333,7 @@
   <div class="loading" id="loading">
     <div class="spinner"></div>
     <div>Steam データを取得中...</div>
-    <div style="font-size:12px;margin-top:8px;color:var(--muted)">SteamSpy APIから最新データを取得しています</div>
+    <div style="font-size:12px;margin-top:8px;color:var(--muted)" id="loadingMsg">SteamSpy APIから最新データを取得しています…</div>
   </div>
 
   <!-- 結果 -->
@@ -495,6 +495,83 @@ function destroyChart(key) {
   if (charts[key]) { charts[key].destroy(); delete charts[key]; }
 }
 
+// ── fetch with timeout ──
+async function fetchWithTimeout(url, ms = 8000) {
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(id);
+    return res;
+  } catch (e) {
+    clearTimeout(id);
+    throw e;
+  }
+}
+
+// ── SteamSpy取得（複数プロキシをフォールバック） ──
+async function fetchSteamSpy(tag) {
+  const apiUrl = `https://steamspy.com/api.php?request=tag&tag=${encodeURIComponent(tag)}`;
+
+  // 試すプロキシの順番（上から順に試す）
+  const strategies = [
+    // 1. 直接（SteamSpyがCORSを許可している場合）
+    async () => {
+      document.getElementById('loadingMsg').textContent = 'SteamSpy APIに接続中…';
+      const res = await fetchWithTimeout(apiUrl, 6000);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    },
+    // 2. corsproxy.io
+    async () => {
+      document.getElementById('loadingMsg').textContent = 'プロキシ経由で再試行中… (1/3)';
+      const res = await fetchWithTimeout(`https://corsproxy.io/?${encodeURIComponent(apiUrl)}`, 8000);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    },
+    // 3. allorigins（contents形式）
+    async () => {
+      document.getElementById('loadingMsg').textContent = 'プロキシ経由で再試行中… (2/3)';
+      const res = await fetchWithTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`, 10000);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const wrapper = await res.json();
+      if (!wrapper.contents) throw new Error('empty contents');
+      return JSON.parse(wrapper.contents);
+    },
+    // 4. allorigins raw形式
+    async () => {
+      document.getElementById('loadingMsg').textContent = 'プロキシ経由で再試行中… (3/3)';
+      const res = await fetchWithTimeout(`https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`, 10000);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    },
+    // 5. jsonp.afeld.me
+    async () => {
+      document.getElementById('loadingMsg').textContent = '別ルートで再試行中…';
+      const res = await fetchWithTimeout(`https://jsonp.afeld.me/?url=${encodeURIComponent(apiUrl)}`, 8000);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    },
+  ];
+
+  let lastError;
+  for (let i = 0; i < strategies.length; i++) {
+    try {
+      const data = await strategies[i]();
+      // 正常なオブジェクトかチェック
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        const keys = Object.keys(data);
+        if (keys.length > 0) return data;
+      }
+      throw new Error('invalid data shape');
+    } catch (e) {
+      lastError = e;
+      // 次を試す
+    }
+  }
+  throw new Error(`全プロキシで取得失敗: ${lastError?.message}`);
+}
+
 // ── 分析メイン ──
 async function analyze() {
   if (!selectedTag) return;
@@ -505,25 +582,16 @@ async function analyze() {
   document.getElementById('analyzeBtn').disabled = true;
 
   try {
-    const tagEncoded = encodeURIComponent(selectedTag.en);
-    // CORSプロキシ経由でSteamSpy APIを叩く
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://steamspy.com/api.php?request=tag&tag=${tagEncoded}`)}`;
-    
-    const res = await fetch(proxyUrl);
-    if (!res.ok) throw new Error('API取得失敗');
-    const wrapper = await res.json();
-    const data = JSON.parse(wrapper.contents);
-
+    const data = await fetchSteamSpy(selectedTag.en);
     const games = Object.values(data);
     if (!games.length) throw new Error('データが見つかりませんでした');
-
     renderResults(games, selectedTag);
 
   } catch (e) {
     document.getElementById('loading').classList.remove('visible');
     document.getElementById('analyzeBtn').disabled = false;
     const err = document.getElementById('errorMsg');
-    err.textContent = `データ取得に失敗しました。しばらく待ってから再試行してください。（${e.message}）`;
+    err.textContent = `データ取得に失敗しました。時間をおいて再試行してください。（${e.message}）`;
     err.classList.add('visible');
   }
 }
