@@ -2,10 +2,10 @@ name: Fetch SteamSpy Data
 
 on:
   schedule:
-    - cron: '0 3 * * *'   # 毎日 日本時間 12:00 に実行
-  workflow_dispatch:        # 手動実行ボタンも有効化
+    - cron: '0 3 * * *'
+  workflow_dispatch:
   push:
-    branches: [main]        # pushのたびにも実行（初回データ取得のため）
+    branches: [main]
 
 jobs:
   fetch:
@@ -16,88 +16,98 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch SteamSpy tag data
+      - name: Fetch all tag data via Python
         run: |
-          mkdir -p data
+          python3 << 'PYEOF'
+          import urllib.request
+          import urllib.parse
+          import json
+          import time
+          import os
 
-          TAGS=(
-            "Roguelike"
-            "Roguelite"
-            "Metroidvania"
-            "Platformer"
-            "Action RPG"
-            "Survival"
-            "Tower Defense"
-            "Puzzle"
-            "Visual Novel"
-            "Horror"
-            "Sandbox"
-            "Strategy"
-            "Simulation"
-            "Fighting"
-            "Shoot 'em up"
-          )
-
-          for TAG in "${TAGS[@]}"; do
-            ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$TAG'))")
-            FILENAME=$(echo "$TAG" | tr ' ' '_' | tr "'" '_')
-            echo "Fetching: $TAG -> data/${FILENAME}.json"
-            curl -s --retry 3 --retry-delay 5 \
-              "https://steamspy.com/api.php?request=tag&tag=${ENCODED}" \
-              -o "data/${FILENAME}.json"
-            sleep 2
-          done
-
-      - name: Generate index manifest
-        run: |
-          python3 - << 'EOF'
-          import os, json
+          os.makedirs("data", exist_ok=True)
 
           tags = [
-            {"en": "Roguelike",      "ja": "ローグライク",         "file": "Roguelike"},
-            {"en": "Roguelite",      "ja": "ローグライト",         "file": "Roguelite"},
-            {"en": "Metroidvania",   "ja": "メトロイドヴァニア",   "file": "Metroidvania"},
-            {"en": "Platformer",     "ja": "プラットフォーマー",   "file": "Platformer"},
-            {"en": "Action RPG",     "ja": "アクションRPG",        "file": "Action_RPG"},
-            {"en": "Survival",       "ja": "サバイバル",           "file": "Survival"},
-            {"en": "Tower Defense",  "ja": "タワーディフェンス",   "file": "Tower_Defense"},
-            {"en": "Puzzle",         "ja": "パズル",               "file": "Puzzle"},
-            {"en": "Visual Novel",   "ja": "ビジュアルノベル",     "file": "Visual_Novel"},
-            {"en": "Horror",         "ja": "ホラー",               "file": "Horror"},
-            {"en": "Sandbox",        "ja": "サンドボックス",       "file": "Sandbox"},
-            {"en": "Strategy",       "ja": "ストラテジー",         "file": "Strategy"},
-            {"en": "Simulation",     "ja": "シミュレーション",     "file": "Simulation"},
-            {"en": "Fighting",       "ja": "格闘",                 "file": "Fighting"},
-            {"en": "Shoot 'em up",   "ja": "シューティング",       "file": "Shoot__em_up"},
+            ("Roguelike",     "Roguelike"),
+            ("Roguelite",     "Roguelite"),
+            ("Metroidvania",  "Metroidvania"),
+            ("Platformer",    "Platformer"),
+            ("Action RPG",    "Action_RPG"),
+            ("Survival",      "Survival"),
+            ("Tower Defense", "Tower_Defense"),
+            ("Puzzle",        "Puzzle"),
+            ("Visual Novel",  "Visual_Novel"),
+            ("Horror",        "Horror"),
+            ("Sandbox",       "Sandbox"),
+            ("Strategy",      "Strategy"),
+            ("Simulation",    "Simulation"),
+            ("Fighting",      "Fighting"),
+            ("Shoot 'em up",  "Shoot__em_up"),
           ]
 
-          # 各ファイルの最終更新時刻とゲーム数を記録
-          manifest = {"tags": [], "updated_at": ""}
-          import datetime
-          manifest["updated_at"] = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+          headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; IndieScope/1.0)"
+          }
 
-          for t in tags:
-            path = f"data/{t['file']}.json"
+          for tag_name, file_name in tags:
+            encoded = urllib.parse.quote(tag_name)
+            url = f"https://steamspy.com/api.php?request=tag&tag={encoded}"
+            print(f"Fetching: {tag_name} -> data/{file_name}.json")
+            try:
+              req = urllib.request.Request(url, headers=headers)
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                raw = resp.read().decode("utf-8")
+                data = json.loads(raw)
+                with open(f"data/{file_name}.json", "w", encoding="utf-8") as f:
+                  json.dump(data, f, ensure_ascii=False)
+                print(f"  OK: {len(data)} games")
+            except Exception as e:
+              print(f"  ERROR: {e}")
+            time.sleep(2)
+
+          # manifest生成
+          import datetime
+          manifest = {
+            "updated_at": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "tags": []
+          }
+          tag_meta = [
+            {"en":"Roguelike",     "ja":"ローグライク",       "file":"Roguelike"},
+            {"en":"Roguelite",     "ja":"ローグライト",       "file":"Roguelite"},
+            {"en":"Metroidvania",  "ja":"メトロイドヴァニア", "file":"Metroidvania"},
+            {"en":"Platformer",    "ja":"プラットフォーマー", "file":"Platformer"},
+            {"en":"Action RPG",    "ja":"アクションRPG",      "file":"Action_RPG"},
+            {"en":"Survival",      "ja":"サバイバル",         "file":"Survival"},
+            {"en":"Tower Defense", "ja":"タワーディフェンス", "file":"Tower_Defense"},
+            {"en":"Puzzle",        "ja":"パズル",             "file":"Puzzle"},
+            {"en":"Visual Novel",  "ja":"ビジュアルノベル",   "file":"Visual_Novel"},
+            {"en":"Horror",        "ja":"ホラー",             "file":"Horror"},
+            {"en":"Sandbox",       "ja":"サンドボックス",     "file":"Sandbox"},
+            {"en":"Strategy",      "ja":"ストラテジー",       "file":"Strategy"},
+            {"en":"Simulation",    "ja":"シミュレーション",   "file":"Simulation"},
+            {"en":"Fighting",      "ja":"格闘",               "file":"Fighting"},
+            {"en":"Shoot 'em up",  "ja":"シューティング",     "file":"Shoot__em_up"},
+          ]
+          for t in tag_meta:
             count = 0
+            path = f"data/{t['file']}.json"
             if os.path.exists(path):
               try:
                 with open(path) as f:
-                  data = json.load(f)
-                  count = len(data)
+                  count = len(json.load(f))
               except:
                 pass
             manifest["tags"].append({**t, "count": count})
 
-          with open("data/manifest.json", "w") as f:
+          with open("data/manifest.json", "w", encoding="utf-8") as f:
             json.dump(manifest, f, ensure_ascii=False, indent=2)
-
           print("manifest.json generated")
-          EOF
+          PYEOF
 
       - name: Commit and push data
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/
-          git diff --staged --quiet && echo "No changes" || \
+          git diff --staged --quiet && echo "No changes to commit" || \
             (git commit -m "chore: update SteamSpy data $(date -u +%Y-%m-%d)" && git push)
