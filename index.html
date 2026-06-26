@@ -495,12 +495,19 @@ function destroyChart(key) {
   if (charts[key]) { charts[key].destroy(); delete charts[key]; }
 }
 
-// ── fetch with timeout ──
-async function fetchWithTimeout(url, ms = 8000) {
+// ── セッションキャッシュ（同タグを2回目以降は即返す） ──
+const dataCache = {};
+
+// ── fetch with timeout + no-cache ──
+async function fetchWithTimeout(url, ms = 10000) {
   const ctrl = new AbortController();
   const id = setTimeout(() => ctrl.abort(), ms);
   try {
-    const res = await fetch(url, { signal: ctrl.signal });
+    const res = await fetch(url, {
+      signal: ctrl.signal,
+      cache: 'no-store',          // ブラウザキャッシュを使わない
+      headers: { 'Cache-Control': 'no-cache' }
+    });
     clearTimeout(id);
     return res;
   } catch (e) {
@@ -509,47 +516,72 @@ async function fetchWithTimeout(url, ms = 8000) {
   }
 }
 
+// ── URLにタイムスタンプを付けてキャッシュバスト ──
+function bustUrl(url) {
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}_t=${Date.now()}`;
+}
+
+// ── データが正常なオブジェクトか検証 ──
+function isValidData(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  const keys = Object.keys(data);
+  if (keys.length === 0) return false;
+  // SteamSpyのゲームオブジェクトは appid を持つ
+  const first = data[keys[0]];
+  return first && (first.appid !== undefined || first.name !== undefined);
+}
+
 // ── SteamSpy取得（複数プロキシをフォールバック） ──
 async function fetchSteamSpy(tag) {
+  // セッションキャッシュがあれば即返す
+  if (dataCache[tag]) {
+    document.getElementById('loadingMsg').textContent = 'キャッシュから読み込み中…';
+    return dataCache[tag];
+  }
+
   const apiUrl = `https://steamspy.com/api.php?request=tag&tag=${encodeURIComponent(tag)}`;
 
-  // 試すプロキシの順番（上から順に試す）
   const strategies = [
-    // 1. 直接（SteamSpyがCORSを許可している場合）
+    // 1. 直接
     async () => {
       document.getElementById('loadingMsg').textContent = 'SteamSpy APIに接続中…';
-      const res = await fetchWithTimeout(apiUrl, 6000);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const res = await fetchWithTimeout(bustUrl(apiUrl), 6000);
+      if (!res.ok) throw new Error(`direct HTTP ${res.status}`);
       return await res.json();
     },
     // 2. corsproxy.io
     async () => {
       document.getElementById('loadingMsg').textContent = 'プロキシ経由で再試行中… (1/3)';
-      const res = await fetchWithTimeout(`https://corsproxy.io/?${encodeURIComponent(apiUrl)}`, 8000);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const url = bustUrl(`https://corsproxy.io/?${encodeURIComponent(apiUrl)}`);
+      const res = await fetchWithTimeout(url, 10000);
+      if (!res.ok) throw new Error(`corsproxy HTTP ${res.status}`);
       return await res.json();
     },
-    // 3. allorigins（contents形式）
+    // 3. allorigins get
     async () => {
       document.getElementById('loadingMsg').textContent = 'プロキシ経由で再試行中… (2/3)';
-      const res = await fetchWithTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`, 10000);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const url = bustUrl(`https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`);
+      const res = await fetchWithTimeout(url, 12000);
+      if (!res.ok) throw new Error(`allorigins HTTP ${res.status}`);
       const wrapper = await res.json();
-      if (!wrapper.contents) throw new Error('empty contents');
+      if (!wrapper.contents) throw new Error('allorigins: empty contents');
       return JSON.parse(wrapper.contents);
     },
-    // 4. allorigins raw形式
+    // 4. allorigins raw
     async () => {
       document.getElementById('loadingMsg').textContent = 'プロキシ経由で再試行中… (3/3)';
-      const res = await fetchWithTimeout(`https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`, 10000);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const url = bustUrl(`https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`);
+      const res = await fetchWithTimeout(url, 12000);
+      if (!res.ok) throw new Error(`allorigins-raw HTTP ${res.status}`);
       return await res.json();
     },
-    // 5. jsonp.afeld.me
+    // 5. htmldriven cors-anywhere
     async () => {
       document.getElementById('loadingMsg').textContent = '別ルートで再試行中…';
-      const res = await fetchWithTimeout(`https://jsonp.afeld.me/?url=${encodeURIComponent(apiUrl)}`, 8000);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const url = bustUrl(`https://cors-anywhere.herokuapp.com/${apiUrl}`);
+      const res = await fetchWithTimeout(url, 10000);
+      if (!res.ok) throw new Error(`cors-anywhere HTTP ${res.status}`);
       return await res.json();
     },
   ];
@@ -558,15 +590,14 @@ async function fetchSteamSpy(tag) {
   for (let i = 0; i < strategies.length; i++) {
     try {
       const data = await strategies[i]();
-      // 正常なオブジェクトかチェック
-      if (data && typeof data === 'object' && !Array.isArray(data)) {
-        const keys = Object.keys(data);
-        if (keys.length > 0) return data;
+      if (isValidData(data)) {
+        dataCache[tag] = data; // 成功したらキャッシュに保存
+        return data;
       }
       throw new Error('invalid data shape');
     } catch (e) {
       lastError = e;
-      // 次を試す
+      // 次のプロキシへ
     }
   }
   throw new Error(`全プロキシで取得失敗: ${lastError?.message}`);
