@@ -52,7 +52,7 @@ jobs:
               ("Strategy",      ["Strategy"]),
               ("Simulation",    ["Simulation"]),
               ("Fighting",      ["Fighting", "2D Fighter"]),
-              ("Shoot_Em_Up",   ["Shoot 'Em Up", "Shoot 'em up", "Shmup"]),
+              ("Shoot_Em_Up",   ["Shoot 'Em Up", "Shoot 'em up", "Shmup", "Bullet Hell", "Twin Stick Shooter"]),
           ]
 
           for file_name, candidates in genres:
