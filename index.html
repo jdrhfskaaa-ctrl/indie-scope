@@ -3,150 +3,283 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>IndieScope — どの海で戦う？ Steamインディー市場の海図</title>
-<meta name="description" content="Steamのインディーゲーム市場をジャンル別に分析。競合数・ヒット率・推定売上から、あなたが戦うべき「海」を見つける市場調査ツール。">
+<title>IndieScope — どの海で戦うかを、数字で決める。</title>
+<meta name="description" content="Steamインディー市場をジャンル別に分析。競合数・ヒット率・推定売上から、あなたの企画が戦うべき「海」を見つける市場調査ツール。">
+<meta property="og:title" content="IndieScope — Steamインディー市場の海図">
+<meta property="og:description" content="どの海で戦うかを、数字で決める。競合数×ヒット率でジャンルをブルー/レッドオーシャン判定。">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23070D12'/%3E%3Crect x='10' y='10' width='12' height='12' transform='rotate(45 16 16)' fill='none' stroke='%233FB6E3' stroke-width='2.5'/%3E%3C/svg%3E">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DotGothic16&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap');
 
 :root {
-  --paper:      #EBF0ED;
-  --panel:      #FFFFFF;
-  --ink:        #13323C;
-  --muted:      #5E7A7E;
-  --line:       #CFDCD7;
-  --sea:        #12719A;
-  --sea-soft:   #DDEBF1;
-  --amber:      #B97F0A;
-  --amber-soft: #F4E9CF;
-  --coral:      #C7483B;
-  --coral-soft: #F6DFDA;
-  --deep:       #0D2830;
+  --bg:      #070D12;
+  --bg2:     #0B141B;
+  --panel:   #101B23;
+  --panel2:  #15222C;
+  --line:    #1E3341;
+  --line2:   #2A4354;
+  --text:    #DCE7EA;
+  --muted:   #7C929B;
+  --sea:     #3FB6E3;
+  --sea-dim: #1A5F80;
+  --amber:   #E8B84B;
+  --coral:   #F0705E;
+  --coral-dim:#8A3A30;
 }
 
 * { margin:0; padding:0; box-sizing:border-box; }
 html { scroll-behavior:smooth; }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior:auto; } * { animation:none!important; transition:none!important; } }
 
 body {
-  background: var(--paper);
-  color: var(--ink);
+  background: var(--bg);
+  color: var(--text);
   font-family: 'Zen Kaku Gothic New', sans-serif;
-  line-height: 1.7;
+  line-height: 1.75;
+  overflow-x: hidden;
 }
+.mono { font-family:'IBM Plex Mono',monospace; }
+.dot  { font-family:'DotGothic16',monospace; font-weight:400; }
+::selection { background: var(--sea-dim); color:#fff; }
 
-.mono { font-family:'IBM Plex Mono', monospace; }
-.dot  { font-family:'DotGothic16', monospace; }
-
-/* ───────── ヘッダー ───────── */
+/* ═══════════ ヘッダー ═══════════ */
 header {
-  background: var(--deep);
-  color: #E8F0EE;
-  padding: 14px 28px;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
   display: flex;
-  align-items: baseline;
-  gap: 14px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 28px;
+  background: linear-gradient(180deg, rgba(7,13,18,0.92), rgba(7,13,18,0.55) 75%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
-.logo { font-family:'DotGothic16',monospace; font-size:22px; letter-spacing:2px; color:#7FC4DE; }
-.logo b { color:#E8F0EE; font-weight:400; }
-.header-sub { font-size:12px; color:#8FA8AC; }
-.header-update { margin-left:auto; font-size:11px; color:#6E8E93; font-family:'IBM Plex Mono',monospace; }
+.logo {
+  font-family:'DotGothic16',monospace;
+  font-size: 20px;
+  letter-spacing: 2px;
+  color: var(--sea);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.logo b { color: var(--text); font-weight: 400; }
+.logo-mark {
+  width: 11px; height: 11px;
+  border: 2px solid var(--sea);
+  transform: rotate(45deg);
+}
+nav { margin-left: auto; display: flex; gap: 22px; }
+nav a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 12.5px;
+  letter-spacing: 0.5px;
+  transition: color 0.15s;
+}
+nav a:hover { color: var(--sea); }
+.header-update { font-size: 10.5px; color: var(--muted); font-family:'IBM Plex Mono',monospace; }
+@media (max-width: 640px) { nav, .header-update { display: none; } }
 
-/* ───────── ヒーロー ───────── */
+/* ═══════════ ヒーロー（墨流し背景） ═══════════ */
 .hero {
-  max-width: 1080px;
+  position: relative;
+  min-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+#inkCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.hero::after { /* 下端を本文の背景へ溶かす */
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 180px;
+  background: linear-gradient(180deg, transparent, var(--bg));
+  pointer-events: none;
+}
+.hero-inner {
+  position: relative;
+  z-index: 2;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 48px 24px 8px;
+  padding: 100px 28px 60px;
+  width: 100%;
+}
+.hero-eyebrow {
+  font-family:'IBM Plex Mono',monospace;
+  font-size: 12px;
+  letter-spacing: 3px;
+  color: var(--sea);
+  margin-bottom: 18px;
 }
 .hero h1 {
   font-family:'DotGothic16',monospace;
   font-weight: 400;
-  font-size: clamp(26px, 4.5vw, 40px);
-  letter-spacing: 1px;
-  line-height: 1.4;
+  font-size: clamp(34px, 6.4vw, 68px);
+  line-height: 1.32;
+  letter-spacing: 2px;
+  text-shadow: 0 2px 30px rgba(7,13,18,0.8);
 }
-.hero h1 .sea-word   { color: var(--sea); }
-.hero h1 .coral-word { color: var(--coral); }
-.hero p {
-  margin-top: 10px;
-  font-size: 14px;
+.hero h1 .w-sea   { color: var(--sea); }
+.hero h1 .w-coral { color: var(--coral); }
+.hero-sub {
+  margin-top: 22px;
+  font-size: 15px;
+  color: #A8BCC3;
+  max-width: 560px;
+  text-shadow: 0 1px 12px rgba(7,13,18,0.9);
+}
+.hero-stats {
+  display: flex;
+  gap: 34px;
+  margin-top: 40px;
+  flex-wrap: wrap;
+}
+.hero-stat .v {
+  font-family:'IBM Plex Mono',monospace;
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--text);
+}
+.hero-stat .l { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.scroll-hint {
+  position: absolute;
+  bottom: 26px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
   color: var(--muted);
-  max-width: 620px;
+  font-size: 11px;
+  letter-spacing: 2px;
+  font-family:'IBM Plex Mono',monospace;
+  animation: bob 2.2s ease-in-out infinite;
+}
+@keyframes bob { 0%,100%{ transform:translate(-50%,0);} 50%{ transform:translate(-50%,7px);} }
+@media (prefers-reduced-motion: reduce) {
+  .scroll-hint { animation: none; }
 }
 
-/* ───────── 海図（Ocean Map）───────── */
-.ocean-wrap {
-  max-width: 1080px;
-  margin: 28px auto 0;
-  padding: 0 24px;
+/* ═══════════ セクション共通 ═══════════ */
+section.block {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 72px 28px 0;
 }
-.ocean-scroll { overflow-x: auto; }
+.eyebrow {
+  font-family:'IBM Plex Mono',monospace;
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--sea);
+  margin-bottom: 8px;
+}
+.block-title {
+  font-family:'DotGothic16',monospace;
+  font-size: clamp(22px, 3vw, 30px);
+  letter-spacing: 1.5px;
+  margin-bottom: 8px;
+}
+.block-sub { font-size: 13.5px; color: var(--muted); max-width: 640px; margin-bottom: 28px; }
+
+/* ═══════════ 海図 ═══════════ */
+.legend {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  font-size: 12.5px;
+}
+.legend span { display: flex; align-items: center; gap: 7px; color: var(--muted); }
+.legend i {
+  width: 10px; height: 10px;
+  transform: rotate(45deg);
+  display: inline-block;
+}
+.legend .sea i   { background: var(--sea); box-shadow: 0 0 8px var(--sea); }
+.legend .amber i { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+.legend .coral i { background: var(--coral); box-shadow: 0 0 8px var(--coral); }
+
+.ocean-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 18px;
+  overflow-x: auto;
+}
 .ocean {
   position: relative;
-  min-width: 720px;
-  height: 300px;
+  min-width: 760px;
+  height: 320px;
 }
 .ocean-water {
   position: absolute;
-  left: 0; right: 0;
-  top: 110px;
-  height: 80px;
-  border-radius: 6px;
-  background: linear-gradient(90deg,
-    #B7D9E6 0%, #C8DFE0 38%, #EBDDB9 62%, #E9C2B4 100%);
-  border: 1px solid var(--line);
+  left: 8px; right: 8px;
+  top: 122px;
+  height: 76px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #123B52 0%, #16455C 34%, #4A4433 64%, #59332E 100%);
+  border: 1px solid var(--line2);
   overflow: hidden;
 }
-/* 等深線 */
 .ocean-water::before {
-  content: '';
-  position: absolute; inset: 0;
-  background:
-    repeating-linear-gradient(0deg, transparent 0 14px, rgba(19,50,60,0.06) 14px 15px);
+  content:'';
+  position:absolute; inset:0;
+  background: repeating-linear-gradient(0deg, transparent 0 13px, rgba(220,231,234,0.045) 13px 14px);
+}
+.ocean-water::after { /* 水面の光 */
+  content:'';
+  position:absolute; left:0; right:0; top:0; height:22px;
+  background: linear-gradient(180deg, rgba(220,231,234,0.10), transparent);
 }
 .ocean-axis {
   position: absolute;
-  top: 196px;
-  left: 0; right: 0;
+  top: 206px; left: 8px; right: 8px;
   display: flex;
   justify-content: space-between;
   font-size: 11px;
   color: var(--muted);
   font-family:'IBM Plex Mono',monospace;
 }
-.ocean-axis-note {
+.ocean-note {
   position: absolute;
-  top: 216px; left: 0; right: 0;
+  top: 228px; left: 0; right: 0;
   text-align: center;
   font-size: 11px;
-  color: var(--muted);
+  color: #56707A;
 }
 .buoy {
   position: absolute;
-  top: 138px;
-  width: 16px; height: 16px;
+  top: 150px;
+  width: 15px; height: 15px;
   transform: translateX(-8px) rotate(45deg);
-  background: var(--panel);
-  border: 2.5px solid var(--ink);
+  background: var(--bg);
+  border: 2.5px solid;
   cursor: pointer;
-  transition: transform 0.15s;
   z-index: 3;
+  transition: transform 0.15s, box-shadow 0.15s;
 }
-.buoy:hover, .buoy:focus-visible { transform: translateX(-8px) rotate(45deg) scale(1.35); outline:none; }
-.buoy.b-sea   { border-color: var(--sea); }
-.buoy.b-amber { border-color: var(--amber); }
-.buoy.b-coral { border-color: var(--coral); }
-.buoy.active  { background: var(--ink); }
-.buoy.active.b-sea   { background: var(--sea); }
-.buoy.active.b-amber { background: var(--amber); }
-.buoy.active.b-coral { background: var(--coral); }
+.buoy.b-sea   { border-color: var(--sea);   box-shadow: 0 0 10px rgba(63,182,227,0.5); }
+.buoy.b-amber { border-color: var(--amber); box-shadow: 0 0 10px rgba(232,184,75,0.45); }
+.buoy.b-coral { border-color: var(--coral); box-shadow: 0 0 10px rgba(240,112,94,0.5); }
+.buoy:hover, .buoy:focus-visible { transform: translateX(-8px) rotate(45deg) scale(1.4); outline: none; }
+.buoy.active.b-sea   { background: var(--sea);   box-shadow: 0 0 18px var(--sea); }
+.buoy.active.b-amber { background: var(--amber); box-shadow: 0 0 18px var(--amber); }
+.buoy.active.b-coral { background: var(--coral); box-shadow: 0 0 18px var(--coral); }
 
 .buoy-label {
   position: absolute;
   font-size: 11.5px;
   font-weight: 500;
-  color: var(--ink);
+  color: #B9CBD1;
   white-space: nowrap;
   transform: translateX(-50%);
   cursor: pointer;
@@ -158,50 +291,38 @@ header {
   position: absolute;
   left: 50%;
   width: 1px;
-  background: rgba(19,50,60,0.28);
+  background: rgba(124,146,155,0.35);
 }
 .buoy-label.above::after { top: 100%; height: var(--lead, 18px); }
 .buoy-label.below::after { bottom: 100%; height: var(--lead, 18px); }
 .buoy-label:hover { color: var(--sea); }
-.buoy-label.active { font-weight: 700; }
+.buoy-label.active { color: var(--text); font-weight: 700; }
 
-/* ───────── 比較表 ───────── */
-.compare-wrap {
-  max-width: 1080px;
-  margin: 36px auto 0;
-  padding: 0 24px;
-}
-.section-title {
-  font-family:'DotGothic16',monospace;
-  font-size: 17px;
-  letter-spacing: 1px;
-  margin-bottom: 4px;
-}
-.section-sub { font-size: 12.5px; color: var(--muted); margin-bottom: 14px; }
+/* ═══════════ 比較表 ═══════════ */
 .compare-card {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 14px;
   overflow-x: auto;
 }
-table { width:100%; border-collapse: collapse; font-size: 13px; min-width: 640px; }
+table { width:100%; border-collapse: collapse; font-size: 13px; min-width: 720px; }
 thead th {
   text-align: right;
   font-size: 11px;
   font-weight: 500;
   color: var(--muted);
-  padding: 12px 14px 9px;
+  padding: 14px 16px 10px;
   border-bottom: 1px solid var(--line);
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
 }
-thead th:first-child { text-align: left; }
+thead th:first-child { text-align:left; }
 thead th:hover { color: var(--sea); }
-thead th .arrow { font-size: 9px; }
+thead th .arrow { font-size: 9px; color: var(--sea); }
 tbody td {
-  padding: 9px 14px;
-  border-bottom: 1px solid #EDF2F0;
+  padding: 11px 16px;
+  border-bottom: 1px solid #14222B;
   text-align: right;
   font-family:'IBM Plex Mono',monospace;
   font-size: 12.5px;
@@ -209,163 +330,310 @@ tbody td {
 }
 tbody td:first-child { text-align:left; font-family:'Zen Kaku Gothic New',sans-serif; font-weight:500; }
 tbody tr:last-child td { border-bottom:none; }
-tbody tr { cursor:pointer; }
-tbody tr:hover td { background: var(--sea-soft); }
-tbody tr.active td { background: var(--sea-soft); }
+tbody tr { cursor:pointer; transition: background 0.1s; }
+tbody tr:hover td, tbody tr.active td { background: rgba(63,182,227,0.06); }
 .pill {
   display:inline-block;
-  font-size: 10.5px;
+  font-size: 10px;
   font-family:'Zen Kaku Gothic New',sans-serif;
-  padding: 1px 8px;
+  font-weight: 700;
+  padding: 1.5px 9px;
   border-radius: 99px;
-  margin-left: 8px;
-  vertical-align: 1px;
+  margin-left: 9px;
+  vertical-align: 1.5px;
+  letter-spacing: 0.5px;
 }
-.pill.sea   { background:var(--sea-soft);   color:var(--sea); }
-.pill.amber { background:var(--amber-soft); color:var(--amber); }
-.pill.coral { background:var(--coral-soft); color:var(--coral); }
+.pill.sea   { background:rgba(63,182,227,0.14);  color:var(--sea); }
+.pill.amber { background:rgba(232,184,75,0.14);  color:var(--amber); }
+.pill.coral { background:rgba(240,112,94,0.14);  color:var(--coral); }
+.cellbar {
+  display: inline-block;
+  vertical-align: middle;
+  width: 52px; height: 5px;
+  background: #182835;
+  border-radius: 3px;
+  margin-left: 9px;
+  overflow: hidden;
+}
+.cellbar i { display:block; height:100%; border-radius:3px; }
+.hint-row {
+  padding: 10px 16px 12px;
+  font-size: 11.5px;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  line-height: 1.9;
+}
+.hint-row b { color: #A8BCC3; font-weight: 500; }
 
-/* ───────── 詳細 ───────── */
-.detail {
-  max-width: 1080px;
-  margin: 44px auto 0;
-  padding: 0 24px 60px;
-}
-.verdict {
-  border-radius: 10px;
-  padding: 22px 26px;
+/* ═══════════ 詳細 ═══════════ */
+.detail-head {
   display: flex;
-  gap: 18px;
-  align-items: flex-start;
-  border: 1px solid;
+  align-items: baseline;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
 }
-.verdict.sea   { background: var(--sea-soft);   border-color:#B5D3E0; }
-.verdict.amber { background: var(--amber-soft); border-color:#E3CD9C; }
-.verdict.coral { background: var(--coral-soft); border-color:#E8C0B8; }
-.verdict-mark {
-  width: 20px; height: 20px;
-  transform: rotate(45deg);
-  flex-shrink: 0;
-  margin-top: 5px;
+.detail-genre {
+  font-family:'DotGothic16',monospace;
+  font-size: clamp(30px, 4.6vw, 46px);
+  letter-spacing: 2px;
+  line-height: 1.2;
 }
-.verdict.sea   .verdict-mark { background: var(--sea); }
-.verdict.amber .verdict-mark { background: var(--amber); }
-.verdict.coral .verdict-mark { background: var(--coral); }
-.verdict-title { font-family:'DotGothic16',monospace; font-size: 19px; letter-spacing:0.5px; }
-.verdict.sea   .verdict-title { color: var(--sea); }
-.verdict.amber .verdict-title { color: var(--amber); }
-.verdict.coral .verdict-title { color: var(--coral); }
-.verdict-text { font-size: 13.5px; margin-top: 4px; }
+.detail-badge {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 5px 16px;
+  border-radius: 99px;
+  letter-spacing: 1px;
+}
+.detail-badge.sea   { background:rgba(63,182,227,0.14); color:var(--sea);   border:1px solid rgba(63,182,227,0.4); }
+.detail-badge.amber { background:rgba(232,184,75,0.12); color:var(--amber); border:1px solid rgba(232,184,75,0.4); }
+.detail-badge.coral { background:rgba(240,112,94,0.12); color:var(--coral); border:1px solid rgba(240,112,94,0.4); }
+.detail-advice {
+  font-size: 14px;
+  color: #A8BCC3;
+  max-width: 720px;
+  margin-bottom: 26px;
+  padding-left: 14px;
+  border-left: 3px solid var(--line2);
+}
 
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(172px, 1fr));
   gap: 12px;
-  margin-top: 18px;
 }
 .kpi {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 14px 16px;
+  border-radius: 10px;
+  padding: 16px 18px;
+  position: relative;
+  overflow: hidden;
 }
-.kpi-label { font-size: 11px; color: var(--muted); }
-.kpi-value { font-family:'IBM Plex Mono',monospace; font-size: 22px; font-weight: 600; margin-top: 2px; }
-.kpi-sub   { font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+.kpi::before {
+  content:'';
+  position:absolute;
+  left:0; top:0; bottom:0;
+  width: 3px;
+  background: var(--kpi-accent, var(--line2));
+}
+.kpi-label { font-size: 11.5px; color: var(--muted); }
+.kpi-value {
+  font-family:'IBM Plex Mono',monospace;
+  font-size: 24px;
+  font-weight: 600;
+  margin-top: 3px;
+  color: var(--text);
+}
+.kpi-mean { font-size: 11px; color: #56707A; margin-top: 3px; line-height: 1.6; }
 
 .chart-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin-top: 14px;
+  gap: 12px;
+  margin-top: 12px;
 }
 @media (max-width: 680px) { .chart-grid { grid-template-columns: 1fr; } }
 .chart-card {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 16px;
+  border-radius: 10px;
+  padding: 18px;
 }
-.chart-title { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
-.chart-box { position: relative; height: 190px; }
+.chart-title { font-size: 13px; font-weight: 500; }
+.chart-sub   { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+.chart-box { position: relative; height: 200px; }
 
 .top-card {
   background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  margin-top: 14px;
+  border-radius: 10px;
+  margin-top: 12px;
   overflow-x: auto;
 }
-.top-card table { min-width: 680px; }
 .top-card thead th { cursor: default; }
 .top-card thead th:hover { color: var(--muted); }
+.rank {
+  display: inline-block;
+  width: 24px;
+  font-family:'IBM Plex Mono',monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+.rank.r1 { color: var(--amber); font-weight: 700; }
+.rank.r2 { color: #C9D6DB; font-weight: 700; }
+.rank.r3 { color: #C98A5E; font-weight: 700; }
 .game-name { font-weight: 500; }
 .game-dev  { font-size: 11px; color: var(--muted); font-family:'Zen Kaku Gothic New',sans-serif; }
 .scorebar { display:inline-flex; align-items:center; gap:6px; }
-.scorebar .bar { width: 54px; height: 4px; background: #E4ECE9; border-radius: 2px; overflow:hidden; }
-.scorebar .fill { height:100%; background: var(--sea); }
+.scorebar .bar { width: 52px; height: 4px; background: #182835; border-radius: 2px; overflow:hidden; }
+.scorebar .fill { height:100%; background: var(--sea); display:block; }
 
 .method {
-  margin-top: 26px;
-  font-size: 11.5px;
+  margin: 30px 0 0;
+  font-size: 12px;
   color: var(--muted);
-  border-top: 1px solid var(--line);
-  padding-top: 14px;
-  line-height: 1.9;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px 22px;
+  line-height: 2;
 }
-.method b { color: var(--ink); font-weight: 500; }
+.method b { color: #A8BCC3; font-weight: 500; }
+.method-title {
+  font-family:'IBM Plex Mono',monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--sea);
+  margin-bottom: 6px;
+}
 
-.loading-view {
-  max-width: 1080px;
-  margin: 80px auto;
+.loading-view, .err-view {
+  position: relative; z-index: 2;
+  max-width: 680px;
+  margin: 40px auto;
   text-align: center;
   color: var(--muted);
   font-size: 14px;
 }
 .err-view {
-  max-width: 680px;
-  margin: 60px auto;
+  background: rgba(240,112,94,0.08);
+  border: 1px solid rgba(240,112,94,0.3);
+  border-radius: 10px;
   padding: 20px 26px;
-  background: var(--coral-soft);
-  border: 1px solid #E8C0B8;
-  border-radius: 8px;
   color: var(--coral);
-  font-size: 13.5px;
 }
+
 footer {
-  background: var(--deep);
-  color: #6E8E93;
+  margin-top: 80px;
+  border-top: 1px solid var(--line);
+  color: #56707A;
   font-size: 11.5px;
   text-align: center;
-  padding: 18px;
-  line-height: 1.9;
+  padding: 26px 20px 30px;
+  line-height: 2;
 }
-footer a { color:#7FC4DE; text-decoration:none; }
+footer a { color: var(--sea); text-decoration: none; }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">Indie<b>Scope</b></div>
-  <div class="header-sub">Steam インディー市場の海図</div>
+  <a class="logo" href="#"><span class="logo-mark"></span>Indie<b>Scope</b></a>
+  <nav>
+    <a href="#ocean">海図</a>
+    <a href="#compare">比較</a>
+    <a href="#detail">詳細分析</a>
+  </nav>
   <div class="header-update" id="updateTime"></div>
 </header>
 
-<div id="app">
-  <div class="loading-view" id="loadingView">海図を読み込んでいます…</div>
+<div class="hero">
+  <canvas id="inkCanvas"></canvas>
+  <div class="hero-inner">
+    <div class="hero-eyebrow">STEAM INDIE MARKET CHART</div>
+    <h1>どの<span class="w-sea">海</span>で戦うかを、<br>数字で決める。</h1>
+    <p class="hero-sub">Steamのインディーゲーム市場をジャンル別に分析。競合の数、ヒットの出やすさ、価格の相場から、あなたの企画が戦うべき「海」を見つけます。</p>
+    <div class="hero-stats" id="heroStats"></div>
+  </div>
+  <div class="scroll-hint">▼ SCROLL</div>
 </div>
+
+<div id="app"><div class="loading-view">海図を読み込んでいます…</div></div>
 
 <footer>
   IndieScope — インディーゲーム開発者のための市場調査ツール（非公式）<br>
-  データ: <a href="https://steamspy.com" target="_blank" rel="noopener">SteamSpy API</a> ／ 毎日自動更新 ／ Valve Corporationとは関係ありません
+  データ: <a href="https://steamspy.com" target="_blank" rel="noopener">SteamSpy API</a>（毎日自動更新）／ Valve Corporationとは関係ありません
 </footer>
 
 <script>
 'use strict';
 
-const state = { stats: null, selected: null, charts: {}, sortKey: 'count', sortAsc: true };
+/* ═══════════════ 墨流し背景 ═══════════════ */
+(function inkBackground() {
+  const canvas = document.getElementById('inkCanvas');
+  const ctx = canvas.getContext('2d');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// ── フォーマッタ ──
+  let W, H, dpr;
+  function resize() {
+    dpr = Math.min(devicePixelRatio || 1, 2);
+    W = canvas.clientWidth; H = canvas.clientHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    paintBase();
+  }
+  function paintBase() {
+    const grad = ctx.createLinearGradient(0, 0, W, 0);
+    grad.addColorStop(0,    '#0A1B28');
+    grad.addColorStop(0.45, '#0C1D28');
+    grad.addColorStop(1,    '#221317');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  }
+  addEventListener('resize', resize);
+  resize();
+
+  if (reduced) return; // 動きを減らす設定なら静的グラデーションのみ
+
+  // 流線パーティクル（墨の筋）
+  const N = Math.min(150, Math.floor(W / 9));
+  const parts = [];
+  function spawn(p) {
+    p.x = Math.random() * W;
+    p.y = Math.random() * H;
+    p.life = 120 + Math.random() * 260;
+  }
+  for (let i = 0; i < N; i++) { const p = {}; spawn(p); p.life *= Math.random(); parts.push(p); }
+
+  // 疑似カールノイズ（sin/cosの重ね合わせ）
+  function angleAt(x, y, t) {
+    return Math.sin(x * 0.0016 + t * 0.00022) * 1.6
+         + Math.cos(y * 0.0021 - t * 0.00017) * 1.4
+         + Math.sin((x + y) * 0.0008 + t * 0.00011) * 1.2;
+  }
+  function inkColor(x) {
+    const t = Math.min(1, Math.max(0, x / W));
+    // 海(青) → 珊瑚(赤) を x 位置で補間
+    const r = Math.round(63  + (240 - 63)  * t);
+    const g = Math.round(182 + (112 - 182) * t);
+    const b = Math.round(227 + (94  - 227) * t);
+    return `rgba(${r},${g},${b},0.05)`;
+  }
+
+  let last = 0, running = true;
+  document.addEventListener('visibilitychange', () => { running = !document.hidden; });
+
+  function frame(t) {
+    requestAnimationFrame(frame);
+    if (!running || t - last < 33) return; // ~30fps
+    last = t;
+
+    // 残像フェード（墨の滲み）
+    ctx.fillStyle = 'rgba(9,17,24,0.05)';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.lineWidth = 1.1;
+    for (const p of parts) {
+      const a = angleAt(p.x, p.y, t);
+      const nx = p.x + Math.cos(a) * 1.7;
+      const ny = p.y + Math.sin(a) * 1.15;
+      ctx.strokeStyle = inkColor(p.x);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(nx, ny);
+      ctx.stroke();
+      p.x = nx; p.y = ny;
+      if (--p.life <= 0 || nx < -12 || nx > W + 12 || ny < -12 || ny > H + 12) spawn(p);
+    }
+  }
+  requestAnimationFrame(frame);
+})();
+
+/* ═══════════════ アプリ本体 ═══════════════ */
+const state = { stats: null, selected: null, charts: {}, sortKey: 'hit1000_rate', sortAsc: false };
+
 const fmtNum = n => n.toLocaleString('ja-JP');
 const fmtYen = n => '¥' + n.toLocaleString('ja-JP');
 function fmtRevenue(yen) {
@@ -373,22 +641,31 @@ function fmtRevenue(yen) {
   if (yen >= 1e4) return fmtNum(Math.round(yen / 1e4)) + '万円';
   return yen + '円';
 }
+function escHtml(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 
-// ── 海の判定 ──
-// 競合数を基準に、1000レビュー超ヒット率で1段階補正
+// 海の判定：競合数ベース + ヒット率で1段補正
 function verdictOf(g) {
   let level = g.count < 2000 ? 0 : g.count < 8000 ? 1 : 2;
   if (g.hit1000_rate >= 18) level = Math.max(0, level - 1);
   else if (g.hit1000_rate < 8) level = Math.min(2, level + 1);
   return ['sea', 'amber', 'coral'][level];
 }
-const VERDICT_META = {
-  sea:   { name: 'ブルーオーシャン', advice: '競合とヒット率のバランスが良く、参入余地のある海です。差別化したコンセプトが発見されやすい環境です。' },
-  amber: { name: 'イエローオーシャン', advice: '競合は一定数いますが、勝ち筋が残っている海です。ビジュアル・機構・ターゲットのどこかで明確な差別化が必要です。' },
-  coral: { name: 'レッドオーシャン', advice: '競合数が非常に多く、ヒットの生まれにくい海です。よほど尖ったコンセプトと強いマーケティングがなければ埋もれます。' },
+const VM = {
+  sea:   { name: 'ブルーオーシャン', short:'ブルー', advice: '競合とヒット率のバランスが良い、狙い目の海です。差別化したコンセプトが発見されやすい環境です。' },
+  amber: { name: 'イエローオーシャン', short:'イエロー', advice: '競合は多いものの、勝ち筋は残っている海です。ビジュアル・機構・ターゲットのどこかで明確な差別化を。' },
+  coral: { name: 'レッドオーシャン', short:'レッド', advice: '競合が非常に多く、ヒットが生まれにくい海です。参入するなら、よほど尖ったコンセプトと強いマーケティングを。' },
 };
+const PRICE_LABELS = ['無料', '~¥500', '¥500~1K', '¥1K~2K', '¥2K~4K', '¥4K~'];
 
-// ── 初期化 ──
+// 売れ筋価格帯（有料バケットの最頻値）
+function sweetPrice(g) {
+  let bi = 1;
+  for (let i = 2; i < g.price_dist.length; i++) if (g.price_dist[i] > g.price_dist[bi]) bi = i;
+  return PRICE_LABELS[bi];
+}
+
 init();
 async function init() {
   try {
@@ -398,57 +675,77 @@ async function init() {
 
     const d = new Date(state.stats.updated_at);
     document.getElementById('updateTime').textContent =
-      'DATA ' + d.toLocaleDateString('ja-JP', { month:'2-digit', day:'2-digit' }) + ' 更新';
+      'DATA ' + d.toLocaleDateString('ja-JP', { month:'2-digit', day:'2-digit' }) + ' UPDATE';
 
     const valid = state.stats.genres.filter(g => g.valid);
-    if (!valid.length) throw new Error('有効なジャンルデータがありません（次回の自動更新をお待ちください）');
+    if (!valid.length) throw new Error('有効なデータがありません。次回の自動更新をお待ちください。');
 
-    // 初期選択 = もっとも「良い海」（sea優先→ヒット率降順）
-    const sorted = [...valid].sort((a, b) => {
-      const va = verdictOf(a), vb = verdictOf(b);
+    // ヒーロー統計
+    const total = valid.reduce((s, g) => s + g.count, 0);
+    const blues = valid.filter(g => verdictOf(g) === 'sea').length;
+    document.getElementById('heroStats').innerHTML = `
+      <div class="hero-stat"><div class="v">${valid.length}</div><div class="l">分析ジャンル</div></div>
+      <div class="hero-stat"><div class="v">${fmtNum(total)}</div><div class="l">分析タイトル数</div></div>
+      <div class="hero-stat"><div class="v" style="color:var(--sea)">${blues}</div><div class="l">ブルーオーシャン</div></div>
+    `;
+
+    // 初期選択 = もっとも良い海
+    const best = [...valid].sort((a, b) => {
       const rank = { sea: 0, amber: 1, coral: 2 };
-      return rank[va] - rank[vb] || b.hit1000_rate - a.hit1000_rate;
-    });
-    state.selected = sorted[0].id;
+      return rank[verdictOf(a)] - rank[verdictOf(b)] || b.hit1000_rate - a.hit1000_rate;
+    })[0];
+    state.selected = best.id;
 
     render();
   } catch (e) {
     document.getElementById('app').innerHTML =
-      '<div class="err-view">読み込みに失敗しました。<br>' + e.message + '</div>';
+      '<div class="err-view">読み込みに失敗しました。<br>' + escHtml(e.message) + '</div>';
   }
 }
 
-// ── 全体描画 ──
 function render() {
-  const app = document.getElementById('app');
-  app.innerHTML = `
-    <section class="hero">
-      <h1>どの<span class="sea-word">海</span>で戦うかを、<br>数字で決める。</h1>
-      <p>Steamのインディーゲーム市場をジャンル別に分析。競合の数、ヒットの出やすさ、価格の相場から、あなたの企画が戦うべき「海」を見つけます。</p>
-    </section>
-    <section class="ocean-wrap">
-      <div class="ocean-scroll"><div class="ocean" id="oceanMap">
+  document.getElementById('app').innerHTML = `
+    <section class="block" id="ocean">
+      <div class="eyebrow">01 / OCEAN MAP</div>
+      <div class="block-title">海図</div>
+      <div class="block-sub">全ジャンルを競合の多さで海の上に配置しました。左にいるほど競合が少なく、ブイの色が「その海で戦えるか」の判定です。ブイをクリックすると詳細を表示します。</div>
+      <div class="legend">
+        <span class="sea"><i></i>ブルーオーシャン — 狙い目</span>
+        <span class="amber"><i></i>イエローオーシャン — 戦略次第</span>
+        <span class="coral"><i></i>レッドオーシャン — 激戦区</span>
+      </div>
+      <div class="ocean-panel"><div class="ocean" id="oceanMap">
         <div class="ocean-water"></div>
         <div class="ocean-axis"><span>← 競合が少ない</span><span>競合が多い →</span></div>
-        <div class="ocean-axis-note">位置＝インディータイトル数（対数スケール）／ 色＝海の判定</div>
+        <div class="ocean-note">横位置 = インディータイトル数（対数スケール）</div>
       </div></div>
     </section>
-    <section class="compare-wrap">
-      <div class="section-title">ジャンル比較表</div>
-      <div class="section-sub">列見出しをクリックで並べ替え。行をクリックで詳細を表示。</div>
-      <div class="compare-card"><table id="compareTable">
-        <thead><tr>
-          <th data-k="ja">ジャンル <span class="arrow"></span></th>
-          <th data-k="count">競合数 <span class="arrow"></span></th>
-          <th data-k="hit1000_rate">ヒット率 <span class="arrow"></span></th>
-          <th data-k="median_reviews">中央値レビュー <span class="arrow"></span></th>
-          <th data-k="median_price">中央値価格 <span class="arrow"></span></th>
-          <th data-k="est_revenue_median">推定売上中央値 <span class="arrow"></span></th>
-        </tr></thead>
-        <tbody id="compareBody"></tbody>
-      </table></div>
+
+    <section class="block" id="compare">
+      <div class="eyebrow">02 / COMPARE</div>
+      <div class="block-title">ジャンル比較</div>
+      <div class="block-sub">列見出しクリックで並べ替え、行クリックで詳細へ。初期表示は「ヒット率が高い順」です。</div>
+      <div class="compare-card">
+        <table id="compareTable">
+          <thead><tr>
+            <th data-k="ja">ジャンル <span class="arrow"></span></th>
+            <th data-k="count">競合数 <span class="arrow"></span></th>
+            <th data-k="hit1000_rate">ヒット率 <span class="arrow"></span></th>
+            <th data-k="median_reviews">中央値レビュー <span class="arrow"></span></th>
+            <th data-k="median_price">中央値価格 <span class="arrow"></span></th>
+            <th data-k="est_revenue_median">推定売上中央値 <span class="arrow"></span></th>
+          </tr></thead>
+          <tbody id="compareBody"></tbody>
+        </table>
+        <div class="hint-row">
+          <b>ヒット率</b> = レビュー1000件を超えたタイトルの割合（商業的成功の目安ライン）／
+          <b>中央値レビュー</b> = 真ん中のタイトルのレビュー数。そのジャンルの「普通の結果」／
+          <b>推定売上中央値</b> = レビュー数×35×価格による概算
+        </div>
+      </div>
     </section>
-    <section class="detail" id="detailSection"></section>
+
+    <section class="block" id="detail"><div id="detailInner"></div></section>
   `;
   renderOcean();
   renderCompare();
@@ -463,36 +760,35 @@ function render() {
   });
 }
 
-// ── 海図 ──
+/* ── 海図 ── */
 function renderOcean() {
   const map = document.getElementById('oceanMap');
+  map.querySelectorAll('.buoy, .buoy-label').forEach(el => el.remove());
   const valid = state.stats.genres.filter(g => g.valid);
   const logs = valid.map(g => Math.log10(g.count));
   const min = Math.min(...logs), max = Math.max(...logs);
-  const posOf = g => {
-    const t = (Math.log10(g.count) - min) / (max - min || 1);
-    return 6 + t * 88; // 6%〜94%
-  };
+  const posOf = g => 6 + ((Math.log10(g.count) - min) / (max - min || 1)) * 88;
 
-  // ラベル衝突回避: x位置順に上下3段へ交互配置
   const byX = [...valid].sort((a, b) => posOf(a) - posOf(b));
   const tiers = [
-    { cls: 'above', top: 78,  lead: 46 },
-    { cls: 'above', top: 44,  lead: 80 },
-    { cls: 'above', top: 10,  lead: 114 },
-    { cls: 'below', top: 200, lead: 48 },
-    { cls: 'below', top: 232, lead: 80 },
+    { cls: 'above', top: 86,  lead: 50 },
+    { cls: 'above', top: 52,  lead: 84 },
+    { cls: 'above', top: 18,  lead: 118 },
+    { cls: 'below', top: 212, lead: 52 },
+    { cls: 'below', top: 246, lead: 86 },
   ];
   byX.forEach((g, i) => {
     const x = posOf(g);
     const v = verdictOf(g);
     const tier = tiers[i % tiers.length];
+    const tip = `${g.ja} — 競合${fmtNum(g.count)}本・ヒット率${g.hit1000_rate}%`;
 
     const buoy = document.createElement('button');
     buoy.className = `buoy b-${v}` + (g.id === state.selected ? ' active' : '');
     buoy.style.left = x + '%';
-    buoy.title = g.ja;
-    buoy.setAttribute('aria-label', g.ja + 'の詳細を表示');
+    buoy.title = tip;
+    buoy.dataset.gid = g.id;
+    buoy.setAttribute('aria-label', tip);
     buoy.addEventListener('click', () => select(g.id));
     map.appendChild(buoy);
 
@@ -502,12 +798,14 @@ function renderOcean() {
     label.style.top = tier.top + 'px';
     label.style.setProperty('--lead', tier.lead + 'px');
     label.textContent = g.ja;
+    label.title = tip;
+    label.dataset.gid = g.id;
     label.addEventListener('click', () => select(g.id));
     map.appendChild(label);
   });
 }
 
-// ── 比較表 ──
+/* ── 比較表 ── */
 function renderCompare() {
   const valid = state.stats.genres.filter(g => g.valid);
   const k = state.sortKey;
@@ -517,15 +815,19 @@ function renderCompare() {
     return state.sortAsc ? cmp : -cmp;
   });
   document.querySelectorAll('#compareTable thead th').forEach(th => {
-    th.querySelector('.arrow').textContent =
-      th.dataset.k === k ? (state.sortAsc ? '▲' : '▼') : '';
+    th.querySelector('.arrow').textContent = th.dataset.k === k ? (state.sortAsc ? '▲' : '▼') : '';
   });
+
+  const maxCount = Math.max(...valid.map(g => g.count));
+  const maxHit   = Math.max(...valid.map(g => g.hit1000_rate));
+  const barColor = { sea: 'var(--sea)', amber: 'var(--amber)', coral: 'var(--coral)' };
+
   document.getElementById('compareBody').innerHTML = rows.map(g => {
     const v = verdictOf(g);
     return `<tr data-id="${g.id}" class="${g.id === state.selected ? 'active' : ''}">
-      <td>${g.ja}<span class="pill ${v}">${VERDICT_META[v].name.replace('オーシャン','')}</span></td>
-      <td>${fmtNum(g.count)}本</td>
-      <td>${g.hit1000_rate}%</td>
+      <td>${g.ja}<span class="pill ${v}">${VM[v].short}</span></td>
+      <td>${fmtNum(g.count)}<span class="cellbar"><i style="width:${Math.round(g.count/maxCount*100)}%;background:#3B586B"></i></span></td>
+      <td>${g.hit1000_rate}%<span class="cellbar"><i style="width:${Math.round(g.hit1000_rate/maxHit*100)}%;background:${barColor[v]}"></i></span></td>
       <td>${fmtNum(g.median_reviews)}件</td>
       <td>${g.median_price ? fmtYen(g.median_price) : '—'}</td>
       <td>${g.est_revenue_median ? fmtRevenue(g.est_revenue_median) : '—'}</td>
@@ -535,98 +837,108 @@ function renderCompare() {
     tr.addEventListener('click', () => select(tr.dataset.id)));
 }
 
-// ── 選択 ──
+/* ── 選択 ── */
 function select(id) {
   state.selected = id;
-  document.querySelectorAll('.buoy, .buoy-label').forEach(el => el.classList.remove('active'));
-  renderOceanActive(id);
+  document.querySelectorAll('.buoy, .buoy-label').forEach(el =>
+    el.classList.toggle('active', el.dataset.gid === id));
   renderCompare();
   renderDetail();
-  document.getElementById('detailSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-function renderOceanActive(id) {
-  const valid = state.stats.genres.filter(g => g.valid);
-  const buoys = document.querySelectorAll('.buoy');
-  const labels = document.querySelectorAll('.buoy-label');
-  const byX = [...valid].sort((a, b) => a.count - b.count);
-  byX.forEach((g, i) => {
-    if (g.id === id) {
-      buoys[i]?.classList.add('active');
-      labels[i]?.classList.add('active');
-    }
-  });
+  document.getElementById('detail').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-// ── 詳細 ──
+/* ── 詳細 ── */
 function renderDetail() {
   const g = state.stats.genres.find(x => x.id === state.selected);
   if (!g) return;
   const v = verdictOf(g);
-  const meta = VERDICT_META[v];
-  const el = document.getElementById('detailSection');
 
-  el.innerHTML = `
-    <div class="verdict ${v}">
-      <div class="verdict-mark"></div>
-      <div>
-        <div class="verdict-title">${g.ja} — ${meta.name}</div>
-        <div class="verdict-text">インディータイトル数 ${fmtNum(g.count)}本 ・ 1000レビュー超ヒット率 ${g.hit1000_rate}%。${meta.advice}</div>
+  document.getElementById('detailInner').innerHTML = `
+    <div class="eyebrow">03 / DETAIL</div>
+    <div class="detail-head">
+      <div class="detail-genre">${g.ja}</div>
+      <div class="detail-badge ${v}">${VM[v].name}</div>
+    </div>
+    <div class="detail-advice">${VM[v].advice}</div>
+
+    <div class="kpi-grid">
+      <div class="kpi" style="--kpi-accent:var(--${v})">
+        <div class="kpi-label">競合タイトル数</div>
+        <div class="kpi-value">${fmtNum(g.count)}</div>
+        <div class="kpi-mean">この海にいるインディーの数。AAA ${fmtNum(g.aaa_excluded)}本は除外済み</div>
+      </div>
+      <div class="kpi" style="--kpi-accent:var(--${v})">
+        <div class="kpi-label">ヒット率</div>
+        <div class="kpi-value">${g.hit1000_rate}%</div>
+        <div class="kpi-mean">1000レビュー超＝商業的成功ラインを越えた割合</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">中央値レビュー数</div>
+        <div class="kpi-value">${fmtNum(g.median_reviews)}<span style="font-size:13px">件</span></div>
+        <div class="kpi-mean">「普通の結果」。真ん中のタイトルのレビュー数</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">売れ筋価格帯</div>
+        <div class="kpi-value" style="font-size:20px">${sweetPrice(g)}</div>
+        <div class="kpi-mean">有料タイトルが最も集まる価格。中央値は${g.median_price ? fmtYen(g.median_price) : '—'}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">平均スコア</div>
+        <div class="kpi-value">${g.avg_score ?? '—'}${g.avg_score ? '%' : ''}</div>
+        <div class="kpi-mean">好評率の平均。低いほど「量産粗製」が多い海</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">推定売上 中央値</div>
+        <div class="kpi-value" style="font-size:19px">${g.est_revenue_median ? fmtRevenue(g.est_revenue_median) : '—'}</div>
+        <div class="kpi-mean">レビュー数×35×価格による概算（参考値）</div>
       </div>
     </div>
-    <div class="kpi-grid">
-      <div class="kpi"><div class="kpi-label">競合タイトル数</div><div class="kpi-value">${fmtNum(g.count)}</div><div class="kpi-sub">AAA ${fmtNum(g.aaa_excluded)}本を除外済み</div></div>
-      <div class="kpi"><div class="kpi-label">ヒット率</div><div class="kpi-value">${g.hit1000_rate}%</div><div class="kpi-sub">1000レビュー超の割合</div></div>
-      <div class="kpi"><div class="kpi-label">中央値レビュー数</div><div class="kpi-value">${fmtNum(g.median_reviews)}</div><div class="kpi-sub">典型的なタイトルの実績</div></div>
-      <div class="kpi"><div class="kpi-label">中央値価格</div><div class="kpi-value">${g.median_price ? fmtYen(g.median_price) : '—'}</div><div class="kpi-sub">有料タイトルのみ</div></div>
-      <div class="kpi"><div class="kpi-label">平均スコア</div><div class="kpi-value">${g.avg_score ?? '—'}${g.avg_score ? '%' : ''}</div><div class="kpi-sub">好評率（レビュー10件以上）</div></div>
-      <div class="kpi"><div class="kpi-label">推定売上 中央値</div><div class="kpi-value" style="font-size:18px">${g.est_revenue_median ? fmtRevenue(g.est_revenue_median) : '—'}</div><div class="kpi-sub">レビュー数×35×価格</div></div>
-    </div>
+
     <div class="chart-grid">
       <div class="chart-card">
-        <div class="chart-title">レビュー数の分布 — 「どのくらい売れるか」の現実</div>
+        <div class="chart-title">レビュー数の分布</div>
+        <div class="chart-sub">「どのくらい売れるか」の現実。左に寄るほど埋もれるタイトルが多い</div>
         <div class="chart-box"><canvas id="chartReviews"></canvas></div>
       </div>
       <div class="chart-card">
-        <div class="chart-title">価格帯の分布 — このジャンルの相場</div>
+        <div class="chart-title">価格帯の分布</div>
+        <div class="chart-sub">このジャンルの価格相場。値付けの参考に</div>
         <div class="chart-box"><canvas id="chartPrice"></canvas></div>
       </div>
     </div>
+
     <div class="top-card">
       <table>
         <thead><tr>
           <th style="text-align:left">売れ筋トップ12（レビュー数順）</th>
-          <th>レビュー数</th><th>スコア</th><th>価格</th><th>推定累計売上</th>
+          <th>レビュー数</th><th>好評率</th><th>価格</th><th>推定累計売上</th>
         </tr></thead>
         <tbody>${g.top.map((t, i) => `
           <tr style="cursor:default">
-            <td><span class="mono" style="color:var(--muted);font-size:11px;margin-right:8px">${String(i+1).padStart(2,'0')}</span><span class="game-name">${escHtml(t.name)}</span><div class="game-dev" style="margin-left:26px">${escHtml(t.dev)}</div></td>
+            <td><span class="rank r${i+1}">${String(i+1).padStart(2,'0')}</span><span class="game-name">${escHtml(t.name)}</span><div class="game-dev" style="margin-left:24px">${escHtml(t.dev)}</div></td>
             <td>${fmtNum(t.reviews)}</td>
-            <td>${t.score !== null ? `<span class="scorebar"><span class="bar"><span class="fill" style="width:${t.score}%;display:block"></span></span>${t.score}%</span>` : '—'}</td>
+            <td>${t.score !== null ? `<span class="scorebar"><span class="bar"><span class="fill" style="width:${t.score}%"></span></span>${t.score}%</span>` : '—'}</td>
             <td>${t.price === 0 ? '無料' : fmtYen(t.price)}</td>
             <td>${t.est_revenue ? fmtRevenue(t.est_revenue) : '—'}</td>
           </tr>`).join('')}
         </tbody>
       </table>
     </div>
+
     <div class="method">
-      <b>データについて正直に：</b>
-      データ源はSteamSpy API（毎日自動更新）。レビュー数と価格は実測値ですが、<b>推定売上はレビュー数×35（Boxleiter法）×価格による概算</b>で、実際とは大きく異なる場合があります。推定オーナー数500万以上のタイトルはAAAとして分析から除外しています。SteamSpyのタグ取得はレビューの少ない超小規模タイトルを網羅しない場合があり、実際の競合数はこの数字より多い可能性があります。海の判定（ブルー/イエロー/レッド）は競合数とヒット率による機械的な目安であり、個別の企画の成否を保証するものではありません。
+      <div class="method-title">DATA NOTES — データについて正直に</div>
+      データ源はSteamSpy API（毎日自動更新）。<b>レビュー数と価格は実測値</b>ですが、<b>推定売上はレビュー数×35（Boxleiter法）×価格による概算</b>で、実際とは大きく異なる場合があります。推定オーナー数500万以上のタイトルと大手パブリッシャー作品はAAAとして分析から除外しています。SteamSpyのタグ取得はレビューの少ない超小規模タイトルを網羅しない場合があり、実際の競合数はこの数字より多い可能性があります。海の判定は競合数とヒット率による機械的な目安であり、個別の企画の成否を保証するものではありません。
     </div>
   `;
 
   drawCharts(g);
 }
 
-function escHtml(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
 function drawCharts(g) {
   Object.values(state.charts).forEach(c => c.destroy());
   state.charts = {};
-
-  const gridColor = '#E4ECE9';
-  const tickColor = '#5E7A7E';
+  const gridColor = '#182835';
+  const tickColor = '#7C929B';
 
   state.charts.reviews = new Chart(document.getElementById('chartReviews'), {
     type: 'bar',
@@ -634,8 +946,8 @@ function drawCharts(g) {
       labels: ['~50件', '50~200', '200~1K', '1K~5K', '5K件~'],
       datasets: [{
         data: g.review_dist,
-        backgroundColor: ['#C8DCE5', '#A3C8D8', '#6FA9C2', '#3A88A8', '#12719A'],
-        borderRadius: 3,
+        backgroundColor: ['#22384A', '#2A4E66', '#2E6C8E', '#3593BD', '#3FB6E3'],
+        borderRadius: 4,
       }]
     },
     options: {
@@ -651,12 +963,12 @@ function drawCharts(g) {
   state.charts.price = new Chart(document.getElementById('chartPrice'), {
     type: 'doughnut',
     data: {
-      labels: ['無料', '~¥500', '¥500~1K', '¥1K~2K', '¥2K~4K', '¥4K~'],
+      labels: PRICE_LABELS,
       datasets: [{
         data: g.price_dist,
-        backgroundColor: ['#C7483B', '#D98E6B', '#B97F0A', '#6FA9C2', '#3A88A8', '#12719A'],
+        backgroundColor: ['#8A3A30', '#B4593F', '#C98A3B', '#2E6C8E', '#3593BD', '#3FB6E3'],
         borderWidth: 2,
-        borderColor: '#FFFFFF',
+        borderColor: '#101B23',
       }]
     },
     options: {
