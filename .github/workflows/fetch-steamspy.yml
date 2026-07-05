@@ -2,7 +2,7 @@ name: Fetch SteamSpy Data
 
 on:
   schedule:
-    - cron: '0 3 * * *'
+    - cron: '0 3 * * *'   # 毎日 日本時間 12:00
   workflow_dispatch:
   push:
     branches: [main]
@@ -16,98 +16,80 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch all tag data via Python
+      - name: Fetch SteamSpy raw data
         run: |
           python3 << 'PYEOF'
-          import urllib.request
-          import urllib.parse
-          import json
-          import time
-          import os
+          import urllib.request, urllib.parse, json, time, os, hashlib
 
-          os.makedirs("data", exist_ok=True)
+          os.makedirs("raw", exist_ok=True)
+          HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; IndieScope/2.0)"}
 
-          tags = [
-            ("Roguelike",     "Roguelike"),
-            ("Roguelite",     "Roguelite"),
-            ("Metroidvania",  "Metroidvania"),
-            ("Platformer",    "Platformer"),
-            ("Action RPG",    "Action_RPG"),
-            ("Survival",      "Survival"),
-            ("Tower Defense", "Tower_Defense"),
-            ("Puzzle",        "Puzzle"),
-            ("Visual Novel",  "Visual_Novel"),
-            ("Horror",        "Horror"),
-            ("Sandbox",       "Sandbox"),
-            ("Strategy",      "Strategy"),
-            ("Simulation",    "Simulation"),
-            ("Fighting",      "Fighting"),
-            ("Shoot 'em up",  "Shoot__em_up"),
-          ]
-
-          headers = {
-            "User-Agent": "Mozilla/5.0 (compatible; IndieScope/1.0)"
-          }
-
-          for tag_name, file_name in tags:
-            encoded = urllib.parse.quote(tag_name)
-            url = f"https://steamspy.com/api.php?request=tag&tag={encoded}"
-            print(f"Fetching: {tag_name} -> data/{file_name}.json")
-            try:
-              req = urllib.request.Request(url, headers=headers)
+          def fetch(tag):
+              url = f"https://steamspy.com/api.php?request=tag&tag={urllib.parse.quote(tag)}"
+              req = urllib.request.Request(url, headers=HEADERS)
               with urllib.request.urlopen(req, timeout=30) as resp:
-                raw = resp.read().decode("utf-8")
-                data = json.loads(raw)
-                with open(f"data/{file_name}.json", "w", encoding="utf-8") as f:
-                  json.dump(data, f, ensure_ascii=False)
-                print(f"  OK: {len(data)} games")
-            except Exception as e:
-              print(f"  ERROR: {e}")
-            time.sleep(2)
+                  return resp.read()
 
-          # manifest生成
-          import datetime
-          manifest = {
-            "updated_at": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "tags": []
-          }
-          tag_meta = [
-            {"en":"Roguelike",     "ja":"ローグライク",       "file":"Roguelike"},
-            {"en":"Roguelite",     "ja":"ローグライト",       "file":"Roguelite"},
-            {"en":"Metroidvania",  "ja":"メトロイドヴァニア", "file":"Metroidvania"},
-            {"en":"Platformer",    "ja":"プラットフォーマー", "file":"Platformer"},
-            {"en":"Action RPG",    "ja":"アクションRPG",      "file":"Action_RPG"},
-            {"en":"Survival",      "ja":"サバイバル",         "file":"Survival"},
-            {"en":"Tower Defense", "ja":"タワーディフェンス", "file":"Tower_Defense"},
-            {"en":"Puzzle",        "ja":"パズル",             "file":"Puzzle"},
-            {"en":"Visual Novel",  "ja":"ビジュアルノベル",   "file":"Visual_Novel"},
-            {"en":"Horror",        "ja":"ホラー",             "file":"Horror"},
-            {"en":"Sandbox",       "ja":"サンドボックス",     "file":"Sandbox"},
-            {"en":"Strategy",      "ja":"ストラテジー",       "file":"Strategy"},
-            {"en":"Simulation",    "ja":"シミュレーション",   "file":"Simulation"},
-            {"en":"Fighting",      "ja":"格闘",               "file":"Fighting"},
-            {"en":"Shoot 'em up",  "ja":"シューティング",     "file":"Shoot__em_up"},
+          # フォールバック署名を取得（存在しないタグを叩く）
+          fallback = fetch("ZZZ_INVALID_TAG_9999")
+          fallback_hash = hashlib.md5(fallback).hexdigest()
+          print(f"fallback hash: {fallback_hash}")
+          time.sleep(2)
+
+          # タグごとに候補名を順に試す（SteamSpyの正式タグ名の揺れに対応）
+          genres = [
+              ("Rogue-like",    ["Rogue-like", "Roguelike"]),
+              ("Rogue-lite",    ["Rogue-lite", "Roguelite"]),
+              ("Metroidvania",  ["Metroidvania"]),
+              ("Platformer",    ["Platformer", "2D Platformer"]),
+              ("Action_RPG",    ["Action RPG"]),
+              ("Survival",      ["Survival"]),
+              ("Tower_Defense", ["Tower Defense"]),
+              ("Puzzle",        ["Puzzle"]),
+              ("Visual_Novel",  ["Visual Novel"]),
+              ("Horror",        ["Horror"]),
+              ("Sandbox",       ["Sandbox"]),
+              ("Strategy",      ["Strategy"]),
+              ("Simulation",    ["Simulation"]),
+              ("Fighting",      ["Fighting", "2D Fighter"]),
+              ("Shoot_Em_Up",   ["Shoot 'Em Up", "Shoot 'em up", "Shmup"]),
           ]
-          for t in tag_meta:
-            count = 0
-            path = f"data/{t['file']}.json"
-            if os.path.exists(path):
-              try:
-                with open(path) as f:
-                  count = len(json.load(f))
-              except:
-                pass
-            manifest["tags"].append({**t, "count": count})
 
-          with open("data/manifest.json", "w", encoding="utf-8") as f:
-            json.dump(manifest, f, ensure_ascii=False, indent=2)
-          print("manifest.json generated")
+          for file_name, candidates in genres:
+              saved = False
+              for tag in candidates:
+                  try:
+                      raw = fetch(tag)
+                      h = hashlib.md5(raw).hexdigest()
+                      if h == fallback_hash:
+                          print(f"  {tag}: fallback -> next candidate")
+                          time.sleep(2)
+                          continue
+                      data = json.loads(raw)
+                      if len(data) < 10:
+                          print(f"  {tag}: too few ({len(data)}) -> next")
+                          time.sleep(2)
+                          continue
+                      with open(f"raw/{file_name}.json", "wb") as f:
+                          f.write(raw)
+                      print(f"OK {file_name} <- tag '{tag}' ({len(data)} games)")
+                      saved = True
+                      break
+                  except Exception as e:
+                      print(f"  {tag}: ERROR {e}")
+                  finally:
+                      time.sleep(2)
+              if not saved:
+                  print(f"NG {file_name}: all candidates failed")
           PYEOF
 
-      - name: Commit and push data
+      - name: Aggregate to stats.json
+        run: python3 scripts/aggregate.py raw data/stats.json
+
+      - name: Commit and push
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/
-          git diff --staged --quiet && echo "No changes to commit" || \
-            (git commit -m "chore: update SteamSpy data $(date -u +%Y-%m-%d)" && git push)
+          git add data/stats.json
+          git diff --staged --quiet && echo "No changes" || \
+            (git commit -m "chore: update stats $(date -u +%Y-%m-%d)" && git push)
